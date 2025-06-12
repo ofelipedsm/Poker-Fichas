@@ -13,11 +13,8 @@ public class Mesa {
     private final Scanner scanner;
     private int indiceDealer;
     private boolean jogoEmAndamento;
-
-    // --- NOVOS ATRIBUTOS ---
     private int numeroDaMaoAtual;
     private NivelDeBlind nivelDeBlindAtual;
-    // -----------------------
 
 
     public Mesa(String nomeDaSala, ConfiguracoesJogo configuracoes, Scanner scanner) {
@@ -36,12 +33,10 @@ public class Mesa {
         this.jogadores = new ArrayList<>();
         this.indiceDealer = -1;
         this.jogoEmAndamento = false;
-
-        // --- INICIALIZAÇÃO DOS NOVOS ATRIBUTOS ---
         this.numeroDaMaoAtual = 0;
         // Começamos com o primeiro nível de blind definido nas configurações
         this.nivelDeBlindAtual = configuracoes.estruturaDeBlinds().get(0);
-        // ----------------------------------------
+
     }
 
     public void adicionarJogador(Jogador jogador) {
@@ -93,11 +88,11 @@ public class Mesa {
         return Collections.unmodifiableList(jogadores);
     }
 
-
-    // --- MÉTODO ATUALIZADO ---
     private void jogarProximaMao() {
-        this.numeroDaMaoAtual++; // 1. Incrementa o contador de mãos
-        atualizarNivelDeBlind();   // 2. Verifica se o nível de blind deve subir
+        // 1. Incrementa o contador de mãos
+        this.numeroDaMaoAtual++;
+        // 2. Verifica se o nível de blind deve subir
+        atualizarNivelDeBlind();
 
         moverBotaoDealer();
         List<Jogador> jogadoresNaMao = getJogadoresComFichas();
@@ -110,9 +105,7 @@ public class Mesa {
         maoAtual.jogar();
         exibirFichasDeTodos();
     }
-    // -------------------------
 
-    // --- NOVO MÉTODO ---
     /**
      * Verifica se o nível de blind precisa ser atualizado com base no número
      * de mãos jogadas e, se necessário, atualiza e anuncia a mudança.

@@ -91,7 +91,6 @@ public class Mao {
         int indiceBB = getIndiceProximoJogadorAtivo(indiceSB);
         Jogador bigBlind = jogadoresNaMao.get(indiceBB);
 
-        // ALTERAÇÃO: Usa os valores do nível de blind atual
         System.out.print(smallBlind.getNome() + " posta o Small Blind de " + nivelDeBlindAtual.sb() + "... ");
         fazerAposta(smallBlind, nivelDeBlindAtual.sb(), null);
 
@@ -102,10 +101,8 @@ public class Mao {
     }
 
     private void realizarRodadaDeApostas(EstagioDaMao estagio) {
-        if (getJogadoresAindaAptos().size() <= 1) return;
-
-        if (jogadoresNaMao.stream().filter(j -> !devePularJogador(j)).count() < 2) {
-            System.out.println("Não há jogadores suficientes para uma rodada de apostas. Indo para o próximo estágio.");
+        long jogadoresNaoDesistiram = jogadoresNaMao.stream().filter(j -> !jogadoresDesistiram.contains(j)).count();
+        if (jogadoresNaoDesistiram <= 1) {
             return;
         }
 
@@ -116,11 +113,9 @@ public class Mao {
         jogadoresNaMao.forEach(j -> apostasNestaRodada.put(j, 0));
 
         int apostaParaPagar = 0;
-        // ALTERAÇÃO: Usa o Big Blind do nível atual como referência de aumento
         int tamanhoMinimoAumento = nivelDeBlindAtual.bb();
 
         if (estagio == EstagioDaMao.PREFLOP) {
-            // ALTERAÇÃO: A aposta a pagar no pré-flop é o Big Blind do nível atual
             apostaParaPagar = nivelDeBlindAtual.bb();
             for (Jogador j : jogadoresNaMao) {
                 int apostaDoBlind = apostasNaMaoTotal.get(j);
@@ -134,47 +129,59 @@ public class Mao {
         boolean rodadaAtiva = true;
 
         while (rodadaAtiva) {
+            if (jogadoresNaMao.stream().filter(j -> !jogadoresDesistiram.contains(j)).count() <= 1) {
+                rodadaAtiva = false;
+                break;
+            }
+
             Jogador jogador = jogadoresNaMao.get(indiceJogadorAtual);
 
             if (devePularJogador(jogador)) {
-                long jogadoresQuePrecisamAgir = jogadoresNaMao.stream()
-                        .filter(j -> !devePularJogador(j) && !jaAgiuNestaRodada.get(j))
-                        .count();
-                if (jogadoresQuePrecisamAgir <= 1) {
-                    rodadaAtiva = false;
-                }
                 indiceJogadorAtual = getIndiceProximoJogadorAtivo(indiceJogadorAtual);
                 continue;
+            }
+
+            boolean jogadorJaAgiu = jaAgiuNestaRodada.getOrDefault(jogador, false);
+            int apostaAtual = apostasNestaRodada.getOrDefault(jogador, 0);
+
+            if (jogadorJaAgiu && apostaAtual >= apostaParaPagar) {
+                // CORREÇÃO AQUI: Criada uma variável final para usar na lambda.
+                final int apostaFinalCheck = apostaParaPagar;
+                boolean todosIguais = jogadoresNaMao.stream()
+                        .filter(j -> !devePularJogador(j))
+                        .allMatch(j -> jaAgiuNestaRodada.get(j) && (apostasNestaRodada.get(j) == apostaFinalCheck || j.getFichas() == 0));
+                if(todosIguais){
+                    rodadaAtiva = false;
+                    continue;
+                }
             }
 
             AcaoJogador acao = processarAcaoDoJogador(jogador, apostaParaPagar, tamanhoMinimoAumento, apostasNestaRodada);
             jaAgiuNestaRodada.put(jogador, true);
 
             int apostaAtualDoJogador = apostasNestaRodada.get(jogador);
+
             if (acao == AcaoJogador.AUMENTAR || acao == AcaoJogador.APOSTAR) {
                 tamanhoMinimoAumento = apostaAtualDoJogador - apostaParaPagar;
                 apostaParaPagar = apostaAtualDoJogador;
-                jaAgiuNestaRodada.replaceAll((j, v) -> devePularJogador(j));
-                jaAgiuNestaRodada.put(jogador, true);
-            }
 
-            if (getJogadoresAindaAptos().size() <= 1) {
-                rodadaAtiva = false;
-                break;
+                jaAgiuNestaRodada.replaceAll((j, v) -> false);
+                jaAgiuNestaRodada.put(jogador, true);
             }
 
             indiceJogadorAtual = getIndiceProximoJogadorAtivo(indiceJogadorAtual);
 
-            long jogadoresQuePrecisamAgir = jogadoresNaMao.stream()
-                    .filter(j -> !devePularJogador(j) && !jaAgiuNestaRodada.get(j))
-                    .count();
+            boolean todosAgiram = jogadoresNaMao.stream()
+                    .filter(j -> !devePularJogador(j))
+                    .allMatch(jaAgiuNestaRodada::get);
 
+            // CORREÇÃO AQUI: Criada uma variável final para usar na lambda.
             final int apostaFinalDaRodada = apostaParaPagar;
-            boolean todosIguais = jogadoresNaMao.stream()
+            boolean apostasIguais = jogadoresNaMao.stream()
                     .filter(j -> !devePularJogador(j))
                     .allMatch(j -> apostasNestaRodada.get(j) == apostaFinalDaRodada || j.getFichas() == 0);
 
-            if (jogadoresQuePrecisamAgir == 0 && todosIguais) {
+            if (todosAgiram && apostasIguais) {
                 rodadaAtiva = false;
             }
         }
@@ -261,52 +268,73 @@ public class Mao {
     }
 
     private void calcularEConstruirPotes() {
-        pote.limpar();
+        pote.limpar(); // Garante que o pote está vazio antes de começar
 
-        Map<Jogador, Integer> apostasDosJogadoresAtivos = new HashMap<>();
-        for (Jogador jogador : this.jogadoresNaMao) {
-            if (!jogadoresDesistiram.contains(jogador)) {
-                apostasDosJogadoresAtivos.put(jogador, this.apostasNaMaoTotal.get(jogador));
+        // 1. Cria uma cópia das apostas totais de TODOS os jogadores que apostaram algo.
+        // Este é o nosso "pool" de dinheiro a ser distribuído nos potes.
+        Map<Jogador, Integer> apostasRestantes = new HashMap<>(apostasNaMaoTotal);
+
+        // Remove jogadores que não apostaram nada para simplificar.
+        apostasRestantes.entrySet().removeIf(entry -> entry.getValue() == 0);
+
+        // 2. Itera enquanto houver dinheiro a ser colocado em potes.
+        while (!apostasRestantes.isEmpty()) {
+
+            // 3. Encontra o menor valor de aposta entre os jogadores restantes.
+            // Este valor define a "camada" do próximo pote a ser criado.
+            final int camadaDoPote = apostasRestantes.values().stream()
+                    .min(Integer::compare)
+                    .orElse(0);
+
+            if (camadaDoPote == 0) {
+                // Se a menor aposta é 0, significa que todo o dinheiro já foi alocado.
+                break;
             }
-        }
 
-        if (apostasDosJogadoresAtivos.isEmpty()) {
-            return;
-        }
+            int valorDoSubPote = 0;
+            Set<Jogador> jogadoresElegiveis = new HashSet<>();
 
-        List<Integer> niveisDeAposta = apostasDosJogadoresAtivos.values().stream()
-                .distinct()
-                .filter(aposta -> aposta > 0)
-                .sorted()
-                .toList();
+            // 4. Itera sobre a cópia das apostas para construir o sub-pote.
+            Iterator<Map.Entry<Jogador, Integer>> iterator = apostasRestantes.entrySet().iterator();
+            while (iterator.hasNext()) {
+                Map.Entry<Jogador, Integer> apostaEntry = iterator.next();
+                Jogador jogador = apostaEntry.getKey();
+                int apostaDoJogador = apostaEntry.getValue();
 
-        int nivelDeApostaAnterior = 0;
+                // Adiciona a contribuição do jogador para este sub-pote.
+                valorDoSubPote += camadaDoPote;
 
-        for (int nivelAtual : niveisDeAposta) {
-            int contribuicaoPorJogador = nivelAtual - nivelDeApostaAnterior;
+                // O jogador é elegível para este pote que estamos a criar.
+                jogadoresElegiveis.add(jogador);
 
-            // Correção na lógica de cálculo do valor do subpote
-            long totalDeContribuicoesNesteNivel = 0;
-            Set<Jogador> jogadoresContribuintes = new HashSet<>();
-
-            for(Map.Entry<Jogador, Integer> apostaEntry : apostasDosJogadoresAtivos.entrySet()){
-                if(apostaEntry.getValue() >= nivelDeApostaAnterior){
-                    jogadoresContribuintes.add(apostaEntry.getKey());
-                    totalDeContribuicoesNesteNivel += Math.min(apostaEntry.getValue() - nivelDeApostaAnterior, contribuicaoPorJogador);
+                // Subtrai o valor da camada da aposta restante do jogador.
+                int novaApostaRestante = apostaDoJogador - camadaDoPote;
+                if (novaApostaRestante == 0) {
+                    // Se o jogador não tem mais nada a contribuir, remove-o da lista para a próxima iteração.
+                    iterator.remove();
+                } else {
+                    // Caso contrário, atualiza o valor restante dele.
+                    apostaEntry.setValue(novaApostaRestante);
                 }
             }
 
-            Set<Jogador> jogadoresElegiveis = apostasDosJogadoresAtivos.keySet().stream()
-                    .filter(jogador -> apostasDosJogadoresAtivos.get(jogador) >= nivelAtual)
-                    .collect(Collectors.toSet());
+            // 5. Cria o SubPote e adiciona à lista de potes da mão.
+            if (valorDoSubPote > 0) {
+                // Filtra os jogadores elegíveis para apenas aqueles que NÃO desistiram.
+                Set<Jogador> vencedoresElegiveis = jogadoresElegiveis.stream()
+                        .filter(j -> !jogadoresDesistiram.contains(j))
+                        .collect(Collectors.toSet());
 
-            if (totalDeContribuicoesNesteNivel > 0) {
-                Pote.SubPote subPote = new Pote.SubPote(jogadoresElegiveis);
-                subPote.adicionarFichas((int)totalDeContribuicoesNesteNivel);
-                this.pote.getSubPotes().add(subPote);
+                if (!vencedoresElegiveis.isEmpty()) {
+                    Pote.SubPote subPote = new Pote.SubPote(vencedoresElegiveis);
+                    subPote.adicionarFichas(valorDoSubPote);
+                    this.pote.getSubPotes().add(subPote);
+                } else {
+                    if (!this.pote.getSubPotes().isEmpty()) {
+                        this.pote.getSubPotes().get(0).adicionarFichas(valorDoSubPote);
+                    }
+                }
             }
-
-            nivelDeApostaAnterior = nivelAtual;
         }
     }
 

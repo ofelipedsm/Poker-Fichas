@@ -23,7 +23,7 @@ public class GerenciadorPokerApp {
 
             // 4. Iniciar o jogo.
             // A partir deste ponto, o controle é passado para o objeto 'mesa'.
-            // O código ficará "preso" dentro do método iniciarJogo() até o fim da partida.
+            // O código ficará "preso" dentro do metodo iniciarJogo() até o fim da partida.
             mesa.iniciarJogo();
 
         } catch (Exception e) {

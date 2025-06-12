@@ -17,11 +17,6 @@ public enum EstagioDaMao {
     //Um nome mais amigável para exibição na interface do usuário.
     private final String nomeAmigavel;
 
-    /**
-     * Construtor privado para o enum.
-     * É chamado uma vez para cada constante definida acima.
-     * @param nomeAmigavel O nome a ser exibido para o estágio.
-     */
     EstagioDaMao(String nomeAmigavel) {
         this.nomeAmigavel = nomeAmigavel;
     }
