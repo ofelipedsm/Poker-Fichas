@@ -1,4 +1,4 @@
-# Gerenciador de Poker de Mesa
+# Gerenciador de Mesa de Poker
 
 *Um projeto Java para gerenciar fichas, apostas e potes em jogos de poker presenciais. Esta aplicação de console representa a fundação e a prova de conceito para uma futura aplicação web completa.*
 
