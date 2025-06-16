@@ -55,7 +55,7 @@ O resultado desta fase inicial é uma aplicação de console 100% funcional e ro
 
 1.  Clone o repositório:
     ```bash
-    git clone [https://github.com/thorehusfeldt/git-paa-dansk](https://github.com/thorehusfeldt/git-paa-dansk)
+    git clone https://github.com/ofelipedsm/Poker-Fichas.git
     ```
 2.  Navegue até a pasta do projeto.
 3.  Compile o código. (Se estiver a usar um IDE como IntelliJ ou Eclipse, basta carregar o projeto e executar a classe `GerenciadorPokerApp.java`).
